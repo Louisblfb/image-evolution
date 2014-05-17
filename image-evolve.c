@@ -36,6 +36,8 @@ void main_loop();
 
 void seed_poly();
 void draw_poly();
+float get_fitness();
+void copy_dna();
 
 void mutate_color();
 void mutate_points();
@@ -90,15 +92,43 @@ copy_surface(cairo_surface_t *surf, cairo_t *contxt) {
 void
 main_loop() {
 
-    char path[24];
+    char path = 'y';
+    float best_fit;
+    float evol_fit;
     cairo_set_source_rgb(evol_con, 1,1,1);
     cairo_rectangle(evol_con, 0,0, width, height);
     cairo_fill(evol_con);
 
     seed_poly(dna_evol);
-    draw_poly(dna_evol, evol_con, evol_img);
+    copy_dna(dna_evol, dna_best);
+    draw_poly(dna_best, evol_con, evol_img);
+    best_fit = get_fitness(goal_img, evol_img);
     cairo_surface_write_to_png(evol_img, "output/output.png");
 
+    while(path == 'y') {
+        //srand(time(NULL));
+        int dec_poly = rand() % shape_cnt;
+        int dec_mut = rand() % shape_cnt; 
+        printf(" shape: %d operation: %d", dec_poly, dec_mut);
+        if (dec_mut == 0) 
+            mutate_color(dna_evol, dec_poly);
+        else if (dec_mut == 1)
+            mutate_points(dna_evol, dec_poly);
+        else if (dec_mut == 2)
+            mutate_XY(dna_evol, dec_poly);
+        
+        draw_poly(dna_evol, evol_con, evol_img); 
+        evol_fit = get_fitness(goal_img, evol_img);
+
+        if (evol_fit > best_fit) {
+            copy_dna(dna_evol, dna_best);
+            best_fit = evol_fit;
+        }
+        if (stdin !=NULL) {
+            path = fgetc(stdin);
+        }
+    }
+/*
     for (int i=0; i<shape_cnt; i++) {
     sprintf(path, "output/%d-output1.png", i);
     mutate_color(dna_evol, i);
@@ -113,7 +143,7 @@ main_loop() {
     sprintf(path, "output/%d-output3.png", i);
     mutate_XY(dna_evol, i);
     draw_poly(dna_evol, evol_con, evol_img);
-    cairo_surface_write_to_png(evol_img, path);}
+    cairo_surface_write_to_png(evol_img, path);}*/
 }
 
 void
@@ -125,7 +155,7 @@ seed_poly(poly dna[]) {
         for (int j=0; j<point_cnt; j++) {
             dna[i].pointX[j] = (float)rand() / (float)RAND_MAX;
             dna[i].pointY[j] = (float)rand() / (float)RAND_MAX;
-            printf("point %d: %f ", j, dna[i].pointX[j]);
+            /*printf("point %d: %f ", j, dna[i].pointX[j]);*/
         }
         dna[i].x = (float)rand() / (float)RAND_MAX; 
         dna[i].y = (float)rand() / (float)RAND_MAX; 
@@ -133,8 +163,8 @@ seed_poly(poly dna[]) {
         dna[i].g = (float)rand() / (float)RAND_MAX; 
         dna[i].b = (float)rand() / (float)RAND_MAX; 
         dna[i].a = (float)rand() / (float)RAND_MAX; 
-        printf("X: %f Y: %f R: %f G: %f B: %f A: %f\n", 
-                dna[i].x, dna[i].y,dna[i].g,dna[i].b,dna[i].a,dna[i].a);
+        /*printf("X: %f Y: %f R: %f G: %f B: %f A: %f\n", 
+                dna[i].x, dna[i].y,dna[i].g,dna[i].b,dna[i].a,dna[i].a);*/
     }
 }
 
@@ -156,6 +186,7 @@ draw_poly(poly dna[], cairo_t *contxt, cairo_surface_t *surf) {
 void
 mutate_color(poly dna[], int i) {
 
+    srand(time(NULL));
     dna[i].r = (float)rand() / (float)RAND_MAX; 
     dna[i].g = (float)rand() / (float)RAND_MAX; 
     dna[i].b = (float)rand() / (float)RAND_MAX; 
@@ -166,6 +197,7 @@ mutate_color(poly dna[], int i) {
 void
 mutate_points(poly dna[], int i) {
 
+    srand(time(NULL));
     for (int j=0; j<point_cnt; j++) {
         dna[i].pointX[j] = (float)rand() / (float)RAND_MAX;
         dna[i].pointY[j] = (float)rand() / (float)RAND_MAX;
@@ -175,13 +207,61 @@ mutate_points(poly dna[], int i) {
 void 
 mutate_XY(poly dna[], int i) {
 
+    srand(time(NULL));
     dna[i].x = (float)rand() / (float)RAND_MAX; 
     dna[i].y = (float)rand() / (float)RAND_MAX; 
 }
 
+float 
+get_fitness(cairo_surface_t *surface_a, cairo_surface_t *surface_b) {
 
+    unsigned char *goal_surf = cairo_image_surface_get_data(surface_a);
+    unsigned char *test_surf = cairo_image_surface_get_data(surface_b);
 
+    float fitness, max_fitness, cur_fitness;
 
+    for (int y=0; y<height; y++) {
+        for (int x=0; x<width; x++) {                        
+            int pixel = y*width*4 + x*4;
+            
+            unsigned char goal_a = goal_surf[pixel];
+            unsigned char goal_r = goal_surf[pixel+1];
+            unsigned char goal_g = goal_surf[pixel+2];
+            unsigned char goal_b = goal_surf[pixel+3];
+
+            unsigned char test_a = test_surf[pixel];
+            unsigned char test_r = test_surf[pixel+1];
+            unsigned char test_g = test_surf[pixel+2];
+            unsigned char test_b = test_surf[pixel+3];
+
+            max_fitness += goal_a + goal_r + goal_g + goal_b;
+            cur_fitness += test_a + test_r + test_g + test_b;
+            }
+    }
+    fitness = cur_fitness * 100 / max_fitness;
+            
+    printf("%f\n", fitness);
+
+    return fitness;
+}
+
+void
+copy_dna(poly dna_a[], poly dna_b[]) {
+
+    for (int i=0; i<shape_cnt; i++) {
+        for (int j=0; j<point_cnt; j++) {
+            dna_b[i].pointX[j] = dna_a[i].pointX[j];
+            dna_b[i].pointY[j] = dna_a[i].pointY[j];
+        }
+        dna_b[i].x = dna_a[i].x;
+        dna_b[i].y = dna_a[i].y;
+        dna_b[i].r = dna_a[i].r;
+        dna_b[i].g = dna_a[i].g;
+        dna_b[i].b = dna_a[i].b;
+        dna_b[i].a = dna_a[i].a;
+
+    } 
+} 
 
 
 
