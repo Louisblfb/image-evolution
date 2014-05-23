@@ -3,11 +3,13 @@
 #include <time.h> 
 #include <unistd.h>
 #include <string.h>
+#include <limits.h>
 
 #include <cairo/cairo.h>
 
 #define shape_cnt   100
 #define point_cnt   6
+#define ABS(val) ((val) < 0 ? -(val) : (val))
 
 /* global variables */
 cairo_surface_t *goal_img;
@@ -18,6 +20,7 @@ cairo_surface_t *png_get;
 
 int width = 600;
 int height = 600;
+int pert;
 
 /* data structures */
 typedef struct {
@@ -67,7 +70,7 @@ main(int argc, char *argv[]) {
     cairo_scale(goal_con, width, height);
     copy_surface(png_get, goal_con);
 
-    main_loop();
+    main_loop(atoi(argv[2]));
 
     /* write png and cleanup */
     //cairo_surface_write_to_png(evol_img, "output.png");
@@ -90,9 +93,8 @@ copy_surface(cairo_surface_t *surf, cairo_t *contxt) {
 }
 
 void
-main_loop() {
-
-    char path = 'y';
+main_loop(int argc) {
+    int cycle =0;
     float best_fit;
     float evol_fit;
     cairo_set_source_rgb(evol_con, 1,1,1);
@@ -103,54 +105,42 @@ main_loop() {
     copy_dna(dna_evol, dna_best);
     draw_poly(dna_best, evol_con, evol_img);
     best_fit = get_fitness(goal_img, evol_img);
-    cairo_surface_write_to_png(evol_img, "output/output.png");
+    pert = get_fitness(goal_img, goal_img);
+    cairo_surface_write_to_png(evol_img, "initial.png");
 
-    while(path == 'y') {
-        //srand(time(NULL));
-        int dec_poly = rand() % shape_cnt;
-        int dec_mut = rand() % shape_cnt; 
-        printf(" shape: %d operation: %d", dec_poly, dec_mut);
-        if (dec_mut == 0) 
+    while(cycle < argc) {
+        int dec_poly = (int)((rand() / (double)RAND_MAX) * (shape_cnt));
+        int dec_op = (int)((rand() / (double)RAND_MAX) * (3));
+        printf("poly: %d - operation: %d - ", dec_poly, dec_op);
+       
+        if (dec_op == 0) 
             mutate_color(dna_evol, dec_poly);
-        else if (dec_mut == 1)
+        else if (dec_op == 1)
             mutate_points(dna_evol, dec_poly);
-        else if (dec_mut == 2)
+        else if (dec_op == 2)
             mutate_XY(dna_evol, dec_poly);
         
         draw_poly(dna_evol, evol_con, evol_img); 
         evol_fit = get_fitness(goal_img, evol_img);
 
-        if (evol_fit > best_fit) {
+        if (evol_fit < best_fit) {
             copy_dna(dna_evol, dna_best);
             best_fit = evol_fit;
         }
-        if (stdin !=NULL) {
-            path = fgetc(stdin);
-        }
+        else 
+            copy_dna(dna_best, dna_evol);
+        
+        cycle++;
     }
-/*
-    for (int i=0; i<shape_cnt; i++) {
-    sprintf(path, "output/%d-output1.png", i);
-    mutate_color(dna_evol, i);
-    draw_poly(dna_evol, evol_con, evol_img);
-    cairo_surface_write_to_png(evol_img, path);
 
-    sprintf(path, "output/%d-output2.png", i);
-    mutate_points(dna_evol, i);
-    draw_poly(dna_evol, evol_con, evol_img);
-    cairo_surface_write_to_png(evol_img, path);
-
-    sprintf(path, "output/%d-output3.png", i);
-    mutate_XY(dna_evol, i);
-    draw_poly(dna_evol, evol_con, evol_img);
-    cairo_surface_write_to_png(evol_img, path);}*/
+    cairo_surface_write_to_png(evol_img, "final.png");
 }
 
 void
 seed_poly(poly dna[]) {
 
     /* initial seed of all dna attributes */
-    srand(time(NULL));
+    srand(getpid() + time(NULL));
     for (int i=0; i<shape_cnt; i++) {
         for (int j=0; j<point_cnt; j++) {
             dna[i].pointX[j] = (float)rand() / (float)RAND_MAX;
@@ -172,6 +162,10 @@ void
 draw_poly(poly dna[], cairo_t *contxt, cairo_surface_t *surf) {
 
     /* draw dna to surface */
+    cairo_set_source_rgb(contxt, 1,1,1);
+    cairo_rectangle(contxt, 0,0, width,height);
+    cairo_fill(contxt);
+
     cairo_set_line_width(contxt, 0);
     for (int i=0; i<shape_cnt; i++) {
         cairo_set_source_rgba(contxt, dna[i].r,dna[i].g,dna[i].b,dna[i].a);
@@ -186,7 +180,7 @@ draw_poly(poly dna[], cairo_t *contxt, cairo_surface_t *surf) {
 void
 mutate_color(poly dna[], int i) {
 
-    srand(time(NULL));
+    //srand(time(NULL));
     dna[i].r = (float)rand() / (float)RAND_MAX; 
     dna[i].g = (float)rand() / (float)RAND_MAX; 
     dna[i].b = (float)rand() / (float)RAND_MAX; 
@@ -197,7 +191,7 @@ mutate_color(poly dna[], int i) {
 void
 mutate_points(poly dna[], int i) {
 
-    srand(time(NULL));
+    //srand(time(NULL));
     for (int j=0; j<point_cnt; j++) {
         dna[i].pointX[j] = (float)rand() / (float)RAND_MAX;
         dna[i].pointY[j] = (float)rand() / (float)RAND_MAX;
@@ -207,7 +201,7 @@ mutate_points(poly dna[], int i) {
 void 
 mutate_XY(poly dna[], int i) {
 
-    srand(time(NULL));
+    //srand(time(NULL));
     dna[i].x = (float)rand() / (float)RAND_MAX; 
     dna[i].y = (float)rand() / (float)RAND_MAX; 
 }
@@ -218,7 +212,8 @@ get_fitness(cairo_surface_t *surface_a, cairo_surface_t *surface_b) {
     unsigned char *goal_surf = cairo_image_surface_get_data(surface_a);
     unsigned char *test_surf = cairo_image_surface_get_data(surface_b);
 
-    float fitness, max_fitness, cur_fitness;
+    float max_fitness;
+    int fitness;
 
     for (int y=0; y<height; y++) {
         for (int x=0; x<width; x++) {                        
@@ -235,12 +230,16 @@ get_fitness(cairo_surface_t *surface_a, cairo_surface_t *surface_b) {
             unsigned char test_b = test_surf[pixel+3];
 
             max_fitness += goal_a + goal_r + goal_g + goal_b;
-            cur_fitness += test_a + test_r + test_g + test_b;
+            
+            fitness += ABS(test_a - goal_a);
+            fitness += ABS(test_r - goal_r);
+            fitness += ABS(test_g - goal_g);
+            fitness += ABS(test_b - goal_b);
+
             }
     }
-    fitness = cur_fitness * 100 / max_fitness;
             
-    printf("%f\n", fitness);
+    printf("fitness: %0.6f%%\n", ((max_fitness-fitness)/(float)max_fitness) * 100 );
 
     return fitness;
 }
