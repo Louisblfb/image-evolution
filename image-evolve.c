@@ -21,6 +21,7 @@ cairo_surface_t *png_get;
 int width = 600;
 int height = 600;
 int pert;
+float diff = 0.0;
 
 /* data structures */
 typedef struct {
@@ -94,7 +95,7 @@ copy_surface(cairo_surface_t *surf, cairo_t *contxt) {
 
 void
 main_loop(int argc) {
-    int cycle =0;
+    int cycle =0, check = 0;
     float best_fit;
     float evol_fit;
     cairo_set_source_rgb(evol_con, 1,1,1);
@@ -110,8 +111,8 @@ main_loop(int argc) {
 
     while(cycle < argc) {
         int dec_poly = (int)((rand() / (double)RAND_MAX) * (shape_cnt));
-        int dec_op = (int)((rand() / (double)RAND_MAX) * (3));
-        printf("poly: %d - operation: %d - ", dec_poly, dec_op);
+        int dec_op = (int)((rand() / (double)RAND_MAX) * (4));
+        //printf("poly: %d - operation: %d - ", dec_poly, dec_op);
        
         if (dec_op == 0) 
             mutate_color(dna_evol, dec_poly);
@@ -119,18 +120,35 @@ main_loop(int argc) {
             mutate_points(dna_evol, dec_poly);
         else if (dec_op == 2)
             mutate_XY(dna_evol, dec_poly);
+        else if (dec_op == 3) {
+            int ran_poly = (int)((rand() / (double)RAND_MAX) * (shape_cnt));
+            poly temp = dna_evol[dec_poly];
+            dna_evol[dec_poly] = dna_evol[ran_poly];
+            dna_evol[ran_poly] = temp;
+            //printf("poly: %d to poly: %d\n", dec_poly, ran_poly);
+        }
         
         draw_poly(dna_evol, evol_con, evol_img); 
         evol_fit = get_fitness(goal_img, evol_img);
 
         if (evol_fit < best_fit) {
+            printf("cycle: %d/%d fitness: %0.6f%% poly: %d\n", cycle, argc, diff, dec_poly);
             copy_dna(dna_evol, dna_best);
             best_fit = evol_fit;
         }
+    
+        else if (check == 100) {
+            printf("cycle: %d\n", cycle);
+            check = 0;
+        }        
+
         else 
             copy_dna(dna_best, dna_evol);
-        
+       
+        if (check == 100)
+            check = 0; 
         cycle++;
+        check++;
     }
 
     cairo_surface_write_to_png(evol_img, "final.png");
@@ -162,9 +180,9 @@ void
 draw_poly(poly dna[], cairo_t *contxt, cairo_surface_t *surf) {
 
     /* draw dna to surface */
-    cairo_set_source_rgb(contxt, 1,1,1);
-    cairo_rectangle(contxt, 0,0, width,height);
-    cairo_fill(contxt);
+    //cairo_set_source_rgb(contxt, 1,1,1);
+    //cairo_rectangle(contxt, 0,0, width,height);
+    //cairo_fill(contxt);
 
     cairo_set_line_width(contxt, 0);
     for (int i=0; i<shape_cnt; i++) {
@@ -238,8 +256,9 @@ get_fitness(cairo_surface_t *surface_a, cairo_surface_t *surface_b) {
 
             }
     }
-            
-    printf("fitness: %0.6f%%\n", ((max_fitness-fitness)/(float)max_fitness) * 100 );
+     
+    diff = ((max_fitness-fitness) / (float)max_fitness) * 100;
+    //printf("fitness: %0.6f%%\n", ((max_fitness-fitness)/(float)max_fitness) * 100 );
 
     return fitness;
 }
